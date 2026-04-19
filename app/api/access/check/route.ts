@@ -29,10 +29,12 @@ export async function POST(req: NextRequest) {
 
     // Superadmins bypass all checks
     if (user.isSuperadmin) {
+      const rolePerApp = (membership?.rolePerApp ?? {}) as Record<string, string>
+      const appRole = rolePerApp[appId] ?? "SUPERADMIN"
       return NextResponse.json({
         allowed: true,
         reason: "ok",
-        appRole: "owner",
+        appRole,
       })
     }
 
