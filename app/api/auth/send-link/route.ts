@@ -8,7 +8,7 @@ const MAGIC_LINK_TTL_MINUTES = 15
 
 export async function POST(req: NextRequest) {
   try {
-    const { email } = await req.json()
+    const { email, callback } = await req.json()
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email erforderlich" }, { status: 400 })
@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
     })
 
     const baseUrl = process.env.NEXTAUTH_URL ?? "https://auth.hundm.cloud"
-    const link = `${baseUrl}/api/auth/verify?token=${rawToken}`
+    const callbackParam = callback && typeof callback === "string" ? `&callback=${encodeURIComponent(callback)}` : ""
+    const link = `${baseUrl}/api/auth/verify?token=${rawToken}${callbackParam}`
 
     await sendMagicLink({ to: normalized, link, name: user.name })
 

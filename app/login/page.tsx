@@ -11,6 +11,7 @@ function LoginForm() {
   const [error, setError] = useState("")
   const params = useSearchParams()
   const errorParam = params.get("error")
+  const callbackUrl = params.get("callback") ?? ""
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,7 +22,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/send-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, callback: callbackUrl || undefined }),
       })
 
       if (res.ok) {
