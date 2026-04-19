@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
     data: { activeOrgId: orgId },
   })
 
-  const destination = callbackParam ?? "https://hundm.cloud"
+  // Default to fleethub if no callback — better than pointing at the root domain
+  const destination = callbackParam ?? "https://fleethub.hundm.cloud"
   return NextResponse.redirect(destination)
 }

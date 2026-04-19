@@ -62,7 +62,10 @@ export async function GET(req: NextRequest) {
     data: { lastSeenAt: new Date() },
   })
 
-  const destination = callbackParam ?? `${baseUrl}/select-org`
+  const selectOrgUrl = callbackParam
+    ? `${baseUrl}/select-org?callback=${encodeURIComponent(callbackParam)}`
+    : `${baseUrl}/select-org`
+  const destination = selectOrgUrl
 
   const res = NextResponse.redirect(destination)
   res.cookies.set(SESSION_COOKIE, sessionToken, {

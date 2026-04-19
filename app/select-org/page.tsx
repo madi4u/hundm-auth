@@ -2,11 +2,17 @@ import { redirect } from "next/navigation"
 import { getSessionFromCookie } from "@/lib/session"
 import { db } from "@/lib/db"
 
-export default async function SelectOrgPage() {
+export default async function SelectOrgPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callback?: string }>
+}) {
+  const { callback } = await searchParams
   const session = await getSessionFromCookie()
 
   if (!session) {
-    redirect("/login")
+    const loginUrl = `/login${callback ? `?callback=${encodeURIComponent(callback)}` : ""}`
+    redirect(loginUrl)
   }
 
   const memberships = await db.membership.findMany({
@@ -42,7 +48,7 @@ export default async function SelectOrgPage() {
           {memberships.map((m) => (
             <a
               key={m.orgId}
-              href={`/api/auth/switch-org?orgId=${m.orgId}`}
+              href={`/api/auth/switch-org?orgId=${m.orgId}${callback ? `&callback=${encodeURIComponent(callback)}` : ""}`}
               className="block bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-400 transition-colors"
             >
               <div className="font-semibold text-gray-900">{m.org.displayName}</div>
