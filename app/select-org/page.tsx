@@ -1,12 +1,9 @@
 import { redirect } from "next/navigation"
-import { cookies } from "next/headers"
 import { getSessionFromCookie } from "@/lib/session"
 import { db } from "@/lib/db"
 
 export default async function SelectOrgPage() {
-  const jar = await cookies()
-  const cookieHeader = jar.toString()
-  const session = await getSessionFromCookie(cookieHeader)
+  const session = await getSessionFromCookie()
 
   if (!session) {
     redirect("/login")
