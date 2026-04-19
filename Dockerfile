@@ -4,7 +4,7 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --omit=dev 2>/dev/null || npm install
+RUN npm install
 
 FROM base AS builder
 WORKDIR /app
