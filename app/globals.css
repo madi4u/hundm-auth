@@ -1,3 +1,50 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --background:          225 27% 97%;
+    --foreground:          225 27% 6%;
+    --card:                0 0% 100%;
+    --card-foreground:     225 27% 6%;
+    --popover:             0 0% 100%;
+    --popover-foreground:  225 27% 6%;
+    --muted:               224 25% 92%;
+    --muted-foreground:    220 9% 46%;
+    --border:              224 25% 92%;
+    --input:               224 25% 92%;
+    --ring:                226 100% 56%;
+    --primary:             226 100% 56%;
+    --primary-foreground:  0 0% 100%;
+    --secondary:           225 27% 97%;
+    --secondary-foreground:225 27% 6%;
+    --accent:              71 100% 64%;
+    --accent-foreground:   225 27% 6%;
+    --destructive:         14 100% 62%;
+    --destructive-foreground: 0 0% 100%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "ss02";
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
