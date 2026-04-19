@@ -1,8 +1,22 @@
 import nodemailer from "nodemailer"
 
-const transport = nodemailer.createTransport(
-  process.env.EMAIL_SERVER ?? "smtp://localhost:1025"
-)
+function createTransport() {
+  if (process.env.SMTP_HOST) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT ?? "587"),
+      secure: process.env.SMTP_SECURE === "true",
+      requireTLS: process.env.SMTP_REQUIRE_TLS !== "false",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    })
+  }
+  return nodemailer.createTransport(process.env.EMAIL_SERVER ?? "smtp://localhost:1025")
+}
+
+const transport = createTransport()
 
 export async function sendMagicLink({
   to,
@@ -14,14 +28,15 @@ export async function sendMagicLink({
   name: string
 }) {
   const appUrl = process.env.NEXTAUTH_URL ?? "https://auth.hundm.cloud"
+  const from = process.env.SMTP_FROM ?? process.env.EMAIL_FROM ?? "noreply@hundm.cloud"
 
-  if (process.env.NODE_ENV !== "production" || !process.env.EMAIL_SERVER) {
+  if (process.env.NODE_ENV !== "production" || (!process.env.SMTP_HOST && !process.env.EMAIL_SERVER)) {
     console.log(`\n🔑 MAGIC LINK for ${to}:\n${link}\n`)
     return
   }
 
   await transport.sendMail({
-    from: process.env.EMAIL_FROM ?? "noreply@hundm.cloud",
+    from,
     to,
     subject: "Dein Login-Link für H+M Cloud",
     text: `Hallo ${name},\n\nHier ist dein Login-Link:\n${link}\n\nDer Link ist 15 Minuten gültig.\n\nH+M Operation Cloud`,
