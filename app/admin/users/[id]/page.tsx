@@ -1,6 +1,8 @@
 import Link from "next/link"
 import { redirect, notFound } from "next/navigation"
+import crypto from "crypto"
 import { db } from "@/lib/db"
+import { sendMagicLink } from "@/lib/email"
 
 const APPS = [
   { id: "fleethub", label: "FleetHub",      color: "#FF9F1C" },
@@ -11,10 +13,13 @@ const APPS = [
 
 export default async function UserDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ sent?: string; error?: string }>
 }) {
   const { id } = await params
+  const { sent, error: qError } = await searchParams
 
   const [user, allOrgs] = await Promise.all([
     db.user.findUnique({
@@ -51,6 +56,27 @@ export default async function UserDetailPage({
     redirect(`/admin/users/${id}`)
   }
 
+  async function sendLoginLink(_formData: FormData) {
+    "use server"
+    if (!user.isActive) redirect(`/admin/users/${id}?error=inactive`)
+
+    await db.magicLinkToken.deleteMany({ where: { userId: id, usedAt: null } })
+
+    const rawToken = crypto.randomBytes(32).toString("hex")
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex")
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+    await db.magicLinkToken.create({
+      data: { userId: id, email: user.email, tokenHash, expiresAt },
+    })
+
+    const baseUrl = process.env.NEXTAUTH_URL ?? "https://auth.hundm.cloud"
+    const link = `${baseUrl}/api/auth/verify?token=${rawToken}`
+    await sendMagicLink({ to: user.email, link, name: user.name })
+
+    redirect(`/admin/users/${id}?sent=1`)
+  }
+
   async function addMembership(formData: FormData) {
     "use server"
     const orgId = formData.get("orgId") as string
@@ -79,21 +105,43 @@ export default async function UserDetailPage({
         >
           ← Zurück zu Nutzern
         </Link>
-        <div className="flex items-center gap-3 mt-2">
-          <h1 className="text-2xl font-bold tracking-tight font-display">{user.name}</h1>
-          {user.isSuperadmin && (
-            <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium">
-              Superadmin
-            </span>
-          )}
-          {!user.isActive && (
-            <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded font-medium border border-border">
-              Deaktiviert
-            </span>
-          )}
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight font-display">{user.name}</h1>
+            {user.isSuperadmin && (
+              <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium">
+                Superadmin
+              </span>
+            )}
+            {!user.isActive && (
+              <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded font-medium border border-border">
+                Deaktiviert
+              </span>
+            )}
+          </div>
+          <form action={sendLoginLink}>
+            <button
+              type="submit"
+              disabled={!user.isActive}
+              className="px-3 py-1.5 border border-border text-foreground rounded-md text-xs font-medium hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Login-Link senden
+            </button>
+          </form>
         </div>
         <p className="text-muted-foreground text-sm mt-1 font-mono">{user.email}</p>
       </div>
+
+      {sent === "1" && (
+        <div className="mb-5 px-4 py-3 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm">
+          Login-Link wurde an {user.email} gesendet (gültig 24 Stunden).
+        </div>
+      )}
+      {qError === "inactive" && (
+        <div className="mb-5 px-4 py-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+          Deaktivierte Nutzer können keinen Login-Link erhalten.
+        </div>
+      )}
 
       {/* Edit form */}
       <form action={updateUser} className="bg-card border border-border rounded-lg p-6 mb-5 space-y-4">

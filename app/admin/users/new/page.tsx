@@ -1,17 +1,20 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import crypto from "crypto"
 import { db } from "@/lib/db"
+import { sendWelcomeLink } from "@/lib/email"
 
 async function createUser(formData: FormData) {
   "use server"
   const name = (formData.get("name") as string).trim()
   const email = (formData.get("email") as string).trim().toLowerCase()
   const isSuperadmin = formData.get("isSuperadmin") === "on"
+  const sendWelcome = formData.get("sendWelcome") === "on"
 
   const existing = await db.user.findUnique({ where: { email } })
   if (existing) redirect("/admin/users/new?error=exists")
 
-  await db.user.create({
+  const user = await db.user.create({
     data: {
       id: crypto.randomUUID(),
       name,
@@ -19,14 +22,36 @@ async function createUser(formData: FormData) {
       isSuperadmin,
     },
   })
-  redirect("/admin/users")
+
+  if (sendWelcome) {
+    const rawToken = crypto.randomBytes(32).toString("hex")
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex")
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+    await db.magicLinkToken.create({
+      data: {
+        userId: user.id,
+        email,
+        tokenHash,
+        expiresAt,
+      },
+    })
+
+    const baseUrl = process.env.NEXTAUTH_URL ?? "https://auth.hundm.cloud"
+    const link = `${baseUrl}/api/auth/verify?token=${rawToken}`
+    await sendWelcomeLink({ to: email, link, name })
+  }
+
+  redirect("/admin/users?created=1")
 }
 
-export default function NewUserPage({
+export default async function NewUserPage({
   searchParams,
 }: {
-  searchParams: { error?: string }
+  searchParams: Promise<{ error?: string }>
 }) {
+  const { error } = await searchParams
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -39,7 +64,7 @@ export default function NewUserPage({
         <h1 className="text-2xl font-bold tracking-tight font-display mt-2">Nutzer anlegen</h1>
       </div>
 
-      {searchParams.error === "exists" && (
+      {error === "exists" && (
         <div className="mb-5 max-w-lg px-4 py-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
           Diese E-Mail-Adresse ist bereits registriert.
         </div>
@@ -88,6 +113,24 @@ export default function NewUserPage({
             </label>
             <p className="text-xs text-muted-foreground mt-0.5">
               Vollzugriff auf Admin Panel und alle Apps
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 pt-1 border-t border-border">
+          <input
+            id="sendWelcome"
+            name="sendWelcome"
+            type="checkbox"
+            defaultChecked
+            className="w-4 h-4 mt-0.5 rounded border-input accent-primary"
+          />
+          <div>
+            <label htmlFor="sendWelcome" className="text-sm font-medium text-foreground cursor-pointer">
+              Welcome-Mail senden
+            </label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Sendet einen Login-Link per E-Mail (gültig 24 Stunden)
             </p>
           </div>
         </div>
