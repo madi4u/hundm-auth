@@ -3,6 +3,8 @@ import { redirect } from "next/navigation"
 import { getSessionFromCookie } from "@/lib/session"
 import AdminNav from "./admin-nav"
 
+export const dynamic = "force-dynamic"
+
 export const metadata: Metadata = {
   title: "Admin Panel — H+M Operation Cloud",
 }
