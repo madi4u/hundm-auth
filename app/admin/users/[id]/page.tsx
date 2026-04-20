@@ -16,10 +16,10 @@ export default async function UserDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ sent?: string; error?: string }>
+  searchParams: Promise<{ sent?: string; error?: string; confirm?: string }>
 }) {
   const { id } = await params
-  const { sent, error: qError } = await searchParams
+  const { sent, error: qError, confirm } = await searchParams
 
   const [user, allOrgs] = await Promise.all([
     db.user.findUnique({
@@ -75,6 +75,12 @@ export default async function UserDetailPage({
     await sendMagicLink({ to: user.email, link, name: user.name })
 
     redirect(`/admin/users/${id}?sent=1`)
+  }
+
+  async function deleteUser(_formData: FormData) {
+    "use server"
+    await db.user.delete({ where: { id } })
+    redirect("/admin/users")
   }
 
   async function addMembership(formData: FormData) {
@@ -191,6 +197,44 @@ export default async function UserDetailPage({
           </button>
         </div>
       </form>
+
+      {/* Delete confirmation */}
+      {confirm === "delete" ? (
+        <div className="bg-destructive/5 border border-destructive/30 rounded-lg p-6 mb-5">
+          <h2 className="text-sm font-semibold text-destructive mb-1">Nutzer wirklich löschen?</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            <strong className="text-foreground">{user.name}</strong> ({user.email}) wird dauerhaft gelöscht –
+            inklusive aller {user.memberships.length} Organisationszugehörigkeit
+            {user.memberships.length !== 1 ? "en" : ""}, Sessions und Login-Tokens.
+            Diese Aktion kann nicht rückgängig gemacht werden.
+          </p>
+          <div className="flex gap-3">
+            <form action={deleteUser}>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                Ja, Nutzer löschen
+              </button>
+            </form>
+            <Link
+              href={`/admin/users/${id}`}
+              className="px-4 py-2 border border-border text-foreground rounded-md text-sm hover:bg-muted transition-colors"
+            >
+              Abbrechen
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-5 flex justify-end">
+          <Link
+            href={`/admin/users/${id}?confirm=delete`}
+            className="text-xs text-destructive hover:underline"
+          >
+            Nutzer löschen…
+          </Link>
+        </div>
+      )}
 
       {/* Memberships */}
       <div className="bg-card border border-border rounded-lg p-6">

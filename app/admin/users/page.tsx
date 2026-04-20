@@ -90,6 +90,12 @@ export default async function UsersPage() {
                         {user.isActive ? "Deaktivieren" : "Aktivieren"}
                       </button>
                     </form>
+                    <Link
+                      href={`/admin/users/${user.id}?confirm=delete`}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Löschen
+                    </Link>
                   </div>
                 </td>
               </tr>
