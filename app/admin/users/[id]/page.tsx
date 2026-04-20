@@ -79,6 +79,8 @@ export default async function UserDetailPage({
 
   async function deleteUser(_formData: FormData) {
     "use server"
+    // Remove cross-schema memberships first (FK without CASCADE in other app schemas)
+    await db.$executeRaw`DELETE FROM fleethub.user_tenant_memberships WHERE user_id = ${id}`
     await db.user.delete({ where: { id } })
     redirect("/admin/users")
   }
