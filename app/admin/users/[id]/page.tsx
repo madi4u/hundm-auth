@@ -11,10 +11,13 @@ const APPS = [
 
 export default async function UserDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ confirm?: string }>
 }) {
   const { id } = await params
+  const { confirm } = await searchParams
 
   const [user, allOrgs] = await Promise.all([
     db.user.findUnique({
@@ -23,6 +26,9 @@ export default async function UserDetailPage({
         memberships: {
           include: { org: true },
           orderBy: { createdAt: "asc" },
+        },
+        _count: {
+          select: { sessions: true, magicTokens: true },
         },
       },
     }),
@@ -42,6 +48,12 @@ export default async function UserDetailPage({
     const isActive = formData.get("isActive") === "on"
     await db.user.update({ where: { id }, data: { name, email, isSuperadmin, isActive } })
     redirect(`/admin/users/${id}`)
+  }
+
+  async function deleteUser() {
+    "use server"
+    await db.user.delete({ where: { id } })
+    redirect("/admin/users")
   }
 
   async function deleteMembership(formData: FormData) {
@@ -93,7 +105,43 @@ export default async function UserDetailPage({
           )}
         </div>
         <p className="text-muted-foreground text-sm mt-1 font-mono">{user.email}</p>
+        <div className="flex gap-3 mt-4">
+          <Link
+            href={`/admin/users/${id}?confirm=delete`}
+            className="text-xs px-3 py-1.5 rounded border border-destructive/50 text-destructive hover:bg-destructive/5 transition-colors"
+          >
+            Nutzer löschen
+          </Link>
+        </div>
       </div>
+
+      {/* Delete confirmation */}
+      {confirm === "delete" && (
+        <div className="bg-destructive/5 border border-destructive/30 rounded-lg p-6 mb-5">
+          <h2 className="text-sm font-semibold text-destructive mb-2">Nutzer wirklich löschen?</h2>
+          <p className="text-sm text-foreground mb-1">
+            <strong>{user.name}</strong> ({user.email}) wird dauerhaft gelöscht — inklusive aller{" "}
+            {user.memberships.length} Organisationszugehörigkeiten, Sessions und Login-Tokens.
+            Diese Aktion kann nicht rückgängig gemacht werden.
+          </p>
+          <div className="flex gap-3 mt-4">
+            <form action={deleteUser}>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                Ja, Nutzer löschen
+              </button>
+            </form>
+            <Link
+              href={`/admin/users/${id}`}
+              className="px-4 py-2 rounded-md text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors"
+            >
+              Abbrechen
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Edit form */}
       <form action={updateUser} className="bg-card border border-border rounded-lg p-6 mb-5 space-y-4">
