@@ -1,6 +1,8 @@
 import Link from "next/link"
 import { redirect, notFound } from "next/navigation"
+import crypto from "crypto"
 import { db } from "@/lib/db"
+import { sendMagicLink } from "@/lib/email"
 
 const APPS = [
   { id: "fleethub", label: "FleetHub",      color: "#FF9F1C" },
@@ -14,10 +16,10 @@ export default async function UserDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ confirm?: string }>
+  searchParams: Promise<{ sent?: string; error?: string; confirm?: string }>
 }) {
   const { id } = await params
-  const { confirm } = await searchParams
+  const { sent, error: qError, confirm } = await searchParams
 
   const [user, allOrgs] = await Promise.all([
     db.user.findUnique({
@@ -50,17 +52,40 @@ export default async function UserDetailPage({
     redirect(`/admin/users/${id}`)
   }
 
-  async function deleteUser() {
-    "use server"
-    await db.user.delete({ where: { id } })
-    redirect("/admin/users")
-  }
-
   async function deleteMembership(formData: FormData) {
     "use server"
     const membershipId = formData.get("membershipId") as string
     await db.membership.delete({ where: { id: membershipId } })
     redirect(`/admin/users/${id}`)
+  }
+
+  async function sendLoginLink(_formData: FormData) {
+    "use server"
+    if (!user.isActive) redirect(`/admin/users/${id}?error=inactive`)
+
+    await db.magicLinkToken.deleteMany({ where: { userId: id, usedAt: null } })
+
+    const rawToken = crypto.randomBytes(32).toString("hex")
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex")
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+    await db.magicLinkToken.create({
+      data: { userId: id, email: user.email, tokenHash, expiresAt },
+    })
+
+    const baseUrl = process.env.NEXTAUTH_URL ?? "https://auth.hundm.cloud"
+    const link = `${baseUrl}/api/auth/verify?token=${rawToken}`
+    await sendMagicLink({ to: user.email, link, name: user.name })
+
+    redirect(`/admin/users/${id}?sent=1`)
+  }
+
+  async function deleteUser(_formData: FormData) {
+    "use server"
+    // Remove cross-schema memberships first (FK without CASCADE in other app schemas)
+    await db.$executeRaw`DELETE FROM fleethub.user_tenant_memberships WHERE user_id = ${id}`
+    await db.user.delete({ where: { id } })
+    redirect("/admin/users")
   }
 
   async function addMembership(formData: FormData) {
@@ -91,18 +116,29 @@ export default async function UserDetailPage({
         >
           ← Zurück zu Nutzern
         </Link>
-        <div className="flex items-center gap-3 mt-2">
-          <h1 className="text-2xl font-bold tracking-tight font-display">{user.name}</h1>
-          {user.isSuperadmin && (
-            <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium">
-              Superadmin
-            </span>
-          )}
-          {!user.isActive && (
-            <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded font-medium border border-border">
-              Deaktiviert
-            </span>
-          )}
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight font-display">{user.name}</h1>
+            {user.isSuperadmin && (
+              <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium">
+                Superadmin
+              </span>
+            )}
+            {!user.isActive && (
+              <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded font-medium border border-border">
+                Deaktiviert
+              </span>
+            )}
+          </div>
+          <form action={sendLoginLink}>
+            <button
+              type="submit"
+              disabled={!user.isActive}
+              className="px-3 py-1.5 border border-border text-foreground rounded-md text-xs font-medium hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Login-Link senden
+            </button>
+          </form>
         </div>
         <p className="text-muted-foreground text-sm mt-1 font-mono">{user.email}</p>
         <div className="flex gap-3 mt-4">
@@ -115,31 +151,14 @@ export default async function UserDetailPage({
         </div>
       </div>
 
-      {/* Delete confirmation */}
-      {confirm === "delete" && (
-        <div className="bg-destructive/5 border border-destructive/30 rounded-lg p-6 mb-5">
-          <h2 className="text-sm font-semibold text-destructive mb-2">Nutzer wirklich löschen?</h2>
-          <p className="text-sm text-foreground mb-1">
-            <strong>{user.name}</strong> ({user.email}) wird dauerhaft gelöscht — inklusive aller{" "}
-            {user.memberships.length} Organisationszugehörigkeiten, Sessions und Login-Tokens.
-            Diese Aktion kann nicht rückgängig gemacht werden.
-          </p>
-          <div className="flex gap-3 mt-4">
-            <form action={deleteUser}>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
-              >
-                Ja, Nutzer löschen
-              </button>
-            </form>
-            <Link
-              href={`/admin/users/${id}`}
-              className="px-4 py-2 rounded-md text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors"
-            >
-              Abbrechen
-            </Link>
-          </div>
+      {sent === "1" && (
+        <div className="mb-5 px-4 py-3 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm">
+          Login-Link wurde an {user.email} gesendet (gültig 24 Stunden).
+        </div>
+      )}
+      {qError === "inactive" && (
+        <div className="mb-5 px-4 py-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+          Deaktivierte Nutzer können keinen Login-Link erhalten.
         </div>
       )}
 
@@ -191,6 +210,44 @@ export default async function UserDetailPage({
           </button>
         </div>
       </form>
+
+      {/* Delete confirmation */}
+      {confirm === "delete" ? (
+        <div className="bg-destructive/5 border border-destructive/30 rounded-lg p-6 mb-5">
+          <h2 className="text-sm font-semibold text-destructive mb-1">Nutzer wirklich löschen?</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            <strong className="text-foreground">{user.name}</strong> ({user.email}) wird dauerhaft gelöscht –
+            inklusive aller {user.memberships.length} Organisationszugehörigkeit
+            {user.memberships.length !== 1 ? "en" : ""}, Sessions und Login-Tokens.
+            Diese Aktion kann nicht rückgängig gemacht werden.
+          </p>
+          <div className="flex gap-3">
+            <form action={deleteUser}>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                Ja, Nutzer löschen
+              </button>
+            </form>
+            <Link
+              href={`/admin/users/${id}`}
+              className="px-4 py-2 border border-border text-foreground rounded-md text-sm hover:bg-muted transition-colors"
+            >
+              Abbrechen
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-5 flex justify-end">
+          <Link
+            href={`/admin/users/${id}?confirm=delete`}
+            className="text-xs text-destructive hover:underline"
+          >
+            Nutzer löschen…
+          </Link>
+        </div>
+      )}
 
       {/* Memberships */}
       <div className="bg-card border border-border rounded-lg p-6">

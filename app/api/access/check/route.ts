@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         allowed: true,
         reason: "ok",
-        appRole: "owner",
+        appRole: "SUPERADMIN",
       })
     }
 
