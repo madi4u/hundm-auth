@@ -89,12 +89,12 @@ export default function AdminNav({ currentUser }: { currentUser: { name: string;
       <div className="p-4 border-t border-white/[0.06]">
         <div className="text-xs text-[#F6F7FA] font-medium truncate">{currentUser.name}</div>
         <div className="text-[11px] text-[#6B7280] truncate mt-0.5">{currentUser.email}</div>
-        <Link
+        <a
           href="/api/auth/logout"
           className="text-[11px] text-[#6B7280] hover:text-[#F6F7FA] mt-2 inline-block transition-colors"
         >
           Abmelden
-        </Link>
+        </a>
       </div>
     </aside>
   )
