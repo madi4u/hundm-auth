@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { redirect, notFound } from "next/navigation"
-import { revalidatePath } from "next/cache"
 import crypto from "crypto"
 import { db } from "@/lib/db"
 import { sendMagicLink } from "@/lib/email"
@@ -79,20 +78,6 @@ export default async function UserDetailPage({
     await sendMagicLink({ to: user.email, link, name: user.name })
 
     redirect(`/admin/users/${id}?sent=1`)
-  }
-
-  async function deleteUser(_formData: FormData) {
-    "use server"
-    // Nullify nullable FKs in fleethub that lack ON DELETE CASCADE
-    await db.$executeRaw`UPDATE fleethub.vehicle_history_entries SET author_user_id = NULL WHERE author_user_id = ${id}`
-    await db.$executeRaw`UPDATE fleethub.mileage_entries SET user_id = NULL WHERE user_id = ${id}`
-    // Delete rows with NOT NULL FKs in fleethub that lack ON DELETE CASCADE
-    await db.$executeRaw`DELETE FROM fleethub.profiles WHERE user_id = ${id}`
-    await db.$executeRaw`DELETE FROM fleethub.user_tenant_memberships WHERE user_id = ${id}`
-    await db.user.delete({ where: { id } })
-    // Revalidate before redirect so Next.js doesn't try to refetch the now-deleted user page
-    revalidatePath("/admin/users")
-    redirect("/admin/users?deleted=1")
   }
 
   async function addMembership(formData: FormData) {
@@ -229,7 +214,7 @@ export default async function UserDetailPage({
             Diese Aktion kann nicht rückgängig gemacht werden.
           </p>
           <div className="flex gap-3">
-            <form action={deleteUser}>
+            <form action={`/api/admin/users/${id}/delete`} method="post">
               <button
                 type="submit"
                 className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
