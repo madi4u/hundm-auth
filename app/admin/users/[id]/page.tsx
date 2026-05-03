@@ -82,7 +82,11 @@ export default async function UserDetailPage({
 
   async function deleteUser(_formData: FormData) {
     "use server"
-    // Remove cross-schema memberships first (FK without CASCADE in other app schemas)
+    // Nullify nullable FKs in fleethub that lack ON DELETE CASCADE
+    await db.$executeRaw`UPDATE fleethub.vehicle_history_entries SET author_user_id = NULL WHERE author_user_id = ${id}`
+    await db.$executeRaw`UPDATE fleethub.mileage_entries SET user_id = NULL WHERE user_id = ${id}`
+    // Delete rows with NOT NULL FKs in fleethub that lack ON DELETE CASCADE
+    await db.$executeRaw`DELETE FROM fleethub.profiles WHERE user_id = ${id}`
     await db.$executeRaw`DELETE FROM fleethub.user_tenant_memberships WHERE user_id = ${id}`
     await db.user.delete({ where: { id } })
     redirect("/admin/users")
