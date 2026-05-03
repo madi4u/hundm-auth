@@ -36,10 +36,14 @@ export async function getSessionFromCookie(cookieHeader?: string) {
     return null
   }
 
-  await db.session.update({
-    where: { id: session.id },
-    data: { lastActiveAt: new Date() },
-  })
+  try {
+    await db.session.update({
+      where: { id: session.id },
+      data: { lastActiveAt: new Date() },
+    })
+  } catch {
+    // Non-critical — session data was found, update failure doesn't invalidate the session
+  }
 
   return {
     userId: session.userId,

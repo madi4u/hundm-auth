@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { redirect, notFound } from "next/navigation"
+import { revalidatePath } from "next/cache"
 import crypto from "crypto"
 import { db } from "@/lib/db"
 import { sendMagicLink } from "@/lib/email"
@@ -89,7 +90,9 @@ export default async function UserDetailPage({
     await db.$executeRaw`DELETE FROM fleethub.profiles WHERE user_id = ${id}`
     await db.$executeRaw`DELETE FROM fleethub.user_tenant_memberships WHERE user_id = ${id}`
     await db.user.delete({ where: { id } })
-    redirect("/admin/users")
+    // Revalidate before redirect so Next.js doesn't try to refetch the now-deleted user page
+    revalidatePath("/admin/users")
+    redirect("/admin/users?deleted=1")
   }
 
   async function addMembership(formData: FormData) {

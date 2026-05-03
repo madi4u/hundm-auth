@@ -2,7 +2,12 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
 
-export default async function UsersPage() {
+export default async function UsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string }>
+}) {
+  const { deleted } = await searchParams
   const users = await db.user.findMany({
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { memberships: true } } },
@@ -18,6 +23,11 @@ export default async function UsersPage() {
 
   return (
     <div className="p-8">
+      {deleted === "1" && (
+        <div className="mb-6 px-4 py-3 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm">
+          Nutzer wurde erfolgreich gelöscht.
+        </div>
+      )}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight font-display">Nutzer</h1>
